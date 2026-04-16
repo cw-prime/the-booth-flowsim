@@ -430,6 +430,9 @@
     <div class="rail-step" id="nav-commit" onclick="showPanel('commit')">
       <div class="step-dot"></div> Commitment
     </div>
+    <div class="rail-step" id="nav-gate-prep" onclick="showPanel('gate-prep')">
+      <div class="step-dot"></div> Gate Prep
+    </div>
 
     <div class="rail-section">Gates</div>
     <div class="rail-step" id="nav-gate-progress" onclick="showPanel('gate-progress')">
@@ -590,6 +593,22 @@
           <button class="btn" onclick="doCommit()">Confirm Commitment</button>
         </div>
         <div class="result-box" id="commit-result"></div>
+      </div>
+
+      <!-- ── GATE PREP ── -->
+      <div class="panel" id="panel-gate-prep">
+        <div class="panel-title">Gate Prep</div>
+        <div class="panel-desc">POST /api/operator/gate-prep/:part — parts 1–4</div>
+        <div class="pill">Requires COMMITTED or GATE_PREP</div>
+        <div id="gate-prep-status" style="font-family:'Courier New',monospace;font-size:11px;color:var(--muted);margin-bottom:20px"></div>
+        <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">
+          Four-part briefing before the gates begin. Play each part in order.
+        </p>
+        <div id="gate-prep-parts" style="display:flex;flex-direction:column;gap:16px"></div>
+        <div id="gate-prep-begin" style="display:none;margin-top:20px">
+          <button class="btn" onclick="beginGate1FromPrep()">→ Begin Gate 1 [dev]</button>
+        </div>
+        <div class="result-box" id="gate-prep-result"></div>
       </div>
 
       <!-- ── GATE PROGRESS ── -->
@@ -787,6 +806,7 @@ const QA_USERS = [
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   buildIntroPanel();
+  buildGatePrepPanel();
   buildQaUserList();
   updateTokenBadge();
 });
@@ -817,6 +837,86 @@ function buildIntroPanel() {
           <audio id="intro-audio-${i}" controls class="audio-player"></audio>
         </div>
       </div>`;
+  }
+}
+
+function buildGatePrepPanel() {
+  const wrap = document.getElementById('gate-prep-parts');
+  for (let i = 1; i <= 4; i++) {
+    wrap.innerHTML += `
+      <div style="background:var(--warm);border:1px solid var(--dim);border-radius:4px;padding:16px">
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:10px">PART ${i}</div>
+        <button class="btn btn-ghost" id="gp-btn-${i}" onclick="getGatePrepPart(${i})">Part ${i}</button>
+        <div id="gp-loading-${i}" style="display:none;margin-top:10px;font-family:'Courier New',monospace;font-size:10px;color:var(--muted)">Loading…</div>
+        <div id="gp-transcript-${i}" style="display:none;margin-top:12px;font-size:13px;color:#aaa;font-style:italic;line-height:1.7;border-left:2px solid var(--red);padding-left:14px"></div>
+        <div id="gp-audio-${i}-wrap" style="margin-top:10px;display:none">
+          <audio id="gp-audio-${i}" controls class="audio-player"></audio>
+          <button class="btn btn-ghost" style="margin-top:8px;font-size:10px" onclick="document.getElementById('gp-audio-${i}').currentTime=0;document.getElementById('gp-audio-${i}').play()">Replay</button>
+        </div>
+      </div>`;
+  }
+}
+
+async function getGatePrepPart(part) {
+  const loading = document.getElementById(`gp-loading-${part}`);
+  const btn = document.getElementById(`gp-btn-${part}`);
+  loading.style.display = 'block';
+  btn.disabled = true;
+
+  const r = await call('POST', `/api/operator/gate-prep/${part}`);
+
+  loading.style.display = 'none';
+  btn.disabled = false;
+
+  if (r.ok) {
+    // Show transcript
+    const transcript = document.getElementById(`gp-transcript-${part}`);
+    transcript.textContent = r.data.transcript;
+    transcript.style.display = 'block';
+
+    // Show audio + autoplay
+    const wrap = document.getElementById(`gp-audio-${part}-wrap`);
+    const audio = document.getElementById(`gp-audio-${part}`);
+    audio.src = r.data.audioUrl;
+    wrap.style.display = 'block';
+    audio.play().catch(() => {});
+
+    // After part 4, show Begin Gate 1 button
+    if (part === 4) {
+      document.getElementById('gate-prep-begin').style.display = 'block';
+    }
+
+    // Update status display
+    refreshGatePrepStatus();
+  } else {
+    showResult('gate-prep-result', r.data, 'err');
+  }
+}
+
+async function refreshGatePrepStatus() {
+  const r = await call('GET', '/api/users/me');
+  if (r.ok && r.data.user) {
+    const step = r.data.user.characterFile?.intakeStep || r.data.user.intakeStep || '—';
+    document.getElementById('gate-prep-status').textContent = `intakeStep: ${step}`;
+  }
+}
+
+async function beginGate1FromPrep() {
+  // Set status to GATE_1_ELIGIBLE via the commitment-confirm endpoint
+  const r = await call('POST', '/api/operator/commitment-confirm', {
+    confirmed: true,
+    transcription: 'Gate prep complete — ready for gates.',
+  });
+  if (r.ok) {
+    showResult('gate-prep-result', { success: true, message: 'Status → GATE_1_ELIGIBLE. Proceed to Gate 1.' }, 'ok');
+    if (currentUser) {
+      updateUserBar({ ...currentUser, status: 'GATE_1_ELIGIBLE' });
+      currentUser.status = 'GATE_1_ELIGIBLE';
+    }
+    document.getElementById('nav-gate-prep').classList.add('done');
+    setTimeout(() => showPanel('gate-run'), 800);
+  } else {
+    showResult('gate-prep-result', r.data, 'err');
   }
 }
 

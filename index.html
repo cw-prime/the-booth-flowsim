@@ -478,7 +478,7 @@
       <!-- ── REGISTER ── -->
       <div class="panel active" id="panel-register">
         <div class="panel-title">Register</div>
-        <div class="panel-desc">POST /api/auth/register</div>
+        <div class="panel-desc">POST /api/auth/signup</div>
 
         <div class="field"><label>First Name</label><input type="text" id="reg-name" value="Test" /></div>
         <div class="field"><label>Email</label><input type="email" id="reg-email" value="smoke_new@thebooth.app" /></div>
@@ -924,7 +924,7 @@ function clearLog() { document.getElementById('log-entries').innerHTML = ''; }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function doRegister() {
-  const r = await call('POST', '/api/auth/register', {
+  const r = await call('POST', '/api/auth/signup', {
     firstName: document.getElementById('reg-name').value,
     email: document.getElementById('reg-email').value,
     password: document.getElementById('reg-pass').value,

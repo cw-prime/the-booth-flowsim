@@ -1237,7 +1237,14 @@ function renderScoreCard(d, gateNum) {
   } else if (nextAction === 'gate_locked') {
     nextMsg = `🔒 Three attempts reached. 30-day reflection period begins now.`;
   } else if (nextAction === 'next_gate') {
-    nextMsg = `✅ Advancing to Gate ${gateNum + 1}.`;
+    if (gateNum === 7) {
+      nextMsg = `🪙 The coin is complete. All 7 gates passed. Status → GATES_COMPLETE. Proceed to Match Hunt.`;
+      // Update status bar
+      updateUserBar({ ...currentUser, status: 'GATES_COMPLETE' });
+      if (currentUser) currentUser.status = 'GATES_COMPLETE';
+    } else {
+      nextMsg = `✅ Advancing to Gate ${gateNum + 1}.`;
+    }
   }
   if (nextMsg) {
     const nm = document.getElementById('sc-next-action');

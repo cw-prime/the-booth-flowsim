@@ -670,6 +670,7 @@
             <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">OPERATOR FEEDBACK</div>
             <audio id="sc-feedback-audio" controls class="audio-player"></audio>
           </div>
+          <div id="sc-next-action" style="display:none;margin-top:14px;padding:10px 14px;background:rgba(255,255,255,0.05);border-left:3px solid var(--amber);font-size:13px;color:var(--amber);line-height:1.6"></div>
         </div>
 
         <div class="result-box" id="gate-run-result"></div>
@@ -1066,6 +1067,8 @@ async function startGateSession() {
   const gateNum = document.getElementById('gate-num').value;
   hideResult('gate-run-result');
   document.getElementById('gate-score-card').classList.remove('visible');
+  const na = document.getElementById('sc-next-action');
+  if (na) { na.textContent = ''; na.style.display = 'none'; }
   recBlob = null;
   gateSessionId = null;
 
@@ -1155,25 +1158,21 @@ async function submitGate() {
   // Detect MIME
   const mimeType = recBlob.type || 'audio/webm';
 
-  // Get presigned upload URL
-  const urlRes = await call('GET', `/api/gates/${gateNum}/upload-url?sessionId=${gateSessionId}&attempt=${gateAttempt}&mimeType=${encodeURIComponent(mimeType)}`);
-  if (!urlRes.ok) {
-    showResult('gate-run-result', urlRes.data, 'err');
-    btn.disabled = false; btn.textContent = 'Submit Recording';
-    return;
-  }
-
-  const { uploadUrl, r2Key } = urlRes.data;
-
-  // Upload to R2
-  btn.textContent = 'Uploading to R2…';
+  // Upload via proxy (avoids R2 CORS)
+  btn.textContent = 'Uploading…';
+  const base = getApiBase();
+  const token = localStorage.getItem('accessToken') || '';
+  let r2Key;
   try {
-    const upRes = await fetch(uploadUrl, {
-      method: 'PUT',
+    const proxyUrl = `${base}/api/gates/${gateNum}/upload-proxy?sessionId=${gateSessionId}&attempt=${gateAttempt}&mimeType=${encodeURIComponent(mimeType)}`;
+    const upRes = await fetch(proxyUrl, {
+      method: 'POST',
       body: recBlob,
-      headers: { 'Content-Type': mimeType },
+      headers: { 'Content-Type': mimeType, 'Authorization': `Bearer ${token}` },
     });
-    if (!upRes.ok) throw new Error(`R2 upload failed: ${upRes.status}`);
+    const upData = await upRes.json();
+    if (!upRes.ok) throw new Error(upData.error || `Upload failed: ${upRes.status}`);
+    r2Key = upData.r2Key;
   } catch (e) {
     showResult('gate-run-result', { error: e.message }, 'err');
     btn.disabled = false; btn.textContent = 'Submit Recording';
@@ -1192,13 +1191,13 @@ async function submitGate() {
   btn.textContent = 'Submit Recording';
 
   if (submitRes.ok) {
-    renderScoreCard(submitRes.data);
+    renderScoreCard(submitRes.data, gateNum);
   } else {
     showResult('gate-run-result', submitRes.data, 'err');
   }
 }
 
-function renderScoreCard(d) {
+function renderScoreCard(d, gateNum) {
   const card = document.getElementById('gate-score-card');
   card.classList.add('visible');
   const passed = d.passed;
@@ -1217,12 +1216,40 @@ function renderScoreCard(d) {
 
   document.getElementById('sc-transcript').textContent = d.transcript || '—';
 
+  // Show nextAction message
+  const nextAction = d.nextAction;
+  let nextMsg = '';
+  if (nextAction === 'reflection_timer') {
+    nextMsg = `⏳ Gate ${gateNum} complete. Reflection period begins now — return in 24 hours to unlock Gate ${gateNum + 1}.`;
+  } else if (nextAction === 'next_attempt') {
+    const attemptsLeft = d.attemptsRemaining ?? '?';
+    nextMsg = `➡️ Try again when ready. Attempts remaining: ${attemptsLeft}.`;
+  } else if (nextAction === 'gate_locked') {
+    nextMsg = `🔒 Three attempts reached. 30-day reflection period begins now.`;
+  } else if (nextAction === 'next_gate') {
+    nextMsg = `✅ Advancing to Gate ${gateNum + 1}.`;
+  }
+  if (nextMsg) {
+    const nm = document.getElementById('sc-next-action');
+    if (nm) { nm.textContent = nextMsg; nm.style.display = 'block'; }
+  }
+
   if (d.feedbackAudioUrl) {
     const fw = document.getElementById('sc-feedback-wrap');
     const fa = document.getElementById('sc-feedback-audio');
     fa.src = d.feedbackAudioUrl;
     fw.style.display = 'block';
     fa.play().catch(() => {});
+  }
+
+  // Refresh status bar + gate progress after scoring
+  if (passed) {
+    updateUserBar({ ...currentUser, status: 'IN_GATES' });
+    if (currentUser) currentUser.status = 'IN_GATES';
+    setTimeout(() => loadGateProgress(), 800);
+  } else if (nextAction === 'gate_locked') {
+    updateUserBar({ ...currentUser, status: 'GATE_LOCKED' });
+    if (currentUser) currentUser.status = 'GATE_LOCKED';
   }
 }
 

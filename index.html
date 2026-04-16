@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Booth — Flow Simulator</title>
+<style>
+  :root {
+    --red:    #C1121F;
+    --amber:  #D4880A;
+    --cream:  #F5ECD7;
+    --dark:   #1A0A00;
+    --warm:   #231200;
+    --muted:  #6B5B45;
+    --dim:    #3A2510;
+    --green:  #4A7C59;
+    --danger: #ff6b6b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, serif;
+    background: var(--dark);
+    color: var(--cream);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--warm);
+    border-bottom: 1px solid var(--dim);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .topbar-title {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .api-input {
+    background: var(--dark);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 5px 10px;
+    width: 340px;
+  }
+  .token-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .token-badge.has-token { background: rgba(74,124,89,0.2); color: var(--green); border: 1px solid var(--green); }
+  .token-badge.no-token  { background: rgba(193,18,31,0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 53px);
+  }
+
+  /* ── Left rail — journey steps ── */
+  .rail {
+    width: 200px;
+    min-width: 200px;
+    background: var(--warm);
+    border-right: 1px solid var(--dim);
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+  .rail-section {
+    font-family: 'Courier New', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 16px 6px;
+  }
+  .rail-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    transition: background 0.1s;
+    border-left: 3px solid transparent;
+  }
+  .rail-step:hover { background: rgba(255,255,255,0.03); color: var(--cream); }
+  .rail-step.active { color: var(--cream); border-left-color: var(--red); background: rgba(193,18,31,0.08); }
+  .rail-step.done   { color: var(--green); }
+  .rail-step.done .step-dot { background: var(--green); }
+  .rail-step.active .step-dot { background: var(--amber); }
+  .step-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+    flex-shrink: 0;
+  }
+
+  /* ── Main panel ── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    gap: 0;
+  }
+
+  .panel-area {
+    flex: 1;
+    padding: 32px;
+    max-width: 640px;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .panel-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--cream);
+    margin-bottom: 6px;
+  }
+  .panel-desc {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+  }
+
+  /* ── Form elements ── */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  input[type=text], input[type=email], input[type=password], input[type=number], select, textarea {
+    width: 100%;
+    background: var(--warm);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: Georgia, serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--amber); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--red);
+    color: var(--cream);
+    border: none;
+    border-radius: 3px;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 24px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 16px;
+  }
+  .btn-ghost:hover { border-color: var(--cream); color: var(--cream); }
+  .btn-amber {
+    background: var(--amber);
+    color: var(--dark);
+  }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+
+  /* ── Recording UI ── */
+  .rec-widget {
+    background: var(--warm);
+    border: 1px solid var(--dim);
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .rec-light {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--dim);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .rec-light.recording {
+    background: var(--red);
+    box-shadow: 0 0 12px rgba(193,18,31,0.6);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+  }
+  .rec-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 28px;
+    color: var(--cream);
+    letter-spacing: 4px;
+  }
+  .rec-status {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .audio-player { width: 100%; margin-top: 8px; }
+
+  /* ── Status/response box ── */
+  .result-box {
+    background: var(--warm);
+    border: 1px solid var(--dim);
+    border-radius: 4px;
+    padding: 16px;
+    margin-top: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--cream);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+  }
+  .result-box.visible { display: block; }
+  .result-box.ok   { border-color: var(--green); }
+  .result-box.err  { border-color: var(--danger); color: var(--danger); }
+  .result-box.info { border-color: var(--amber); }
+
+  /* ── Score breakdown ── */
+  .score-card {
+    background: var(--warm);
+    border: 1px solid var(--amber);
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 16px;
+    display: none;
+  }
+  .score-card.visible { display: block; }
+  .score-title { font-family: 'Courier New', monospace; font-size: 10px; color: var(--amber); letter-spacing: 2px; margin-bottom: 12px; }
+  .score-total { font-size: 32px; font-weight: 700; color: var(--cream); margin-bottom: 16px; }
+  .score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .score-lbl { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); width: 90px; }
+  .score-track { flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; }
+  .score-fill  { height: 100%; background: var(--red); border-radius: 2px; transition: width 0.4s; }
+  .score-val   { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); width: 28px; text-align: right; }
+  .pass-badge  { display: inline-block; padding: 4px 12px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; margin-top: 8px; }
+  .pass-badge.pass { background: rgba(74,124,89,0.2); color: var(--green); border: 1px solid var(--green); }
+  .pass-badge.fail { background: rgba(193,18,31,0.15); color: var(--danger); border: 1px solid var(--danger); }
+
+  /* ── Notification list ── */
+  .notif-item {
+    background: var(--warm);
+    border-left: 3px solid var(--muted);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .notif-item.unread { border-left-color: var(--red); }
+  .notif-title { font-size: 14px; font-weight: 600; color: var(--cream); margin-bottom: 4px; }
+  .notif-body  { font-size: 13px; color: #bbb; line-height: 1.5; margin-bottom: 6px; }
+  .notif-meta  { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); }
+
+  /* ── Gate progress grid ── */
+  .gate-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin: 20px 0; }
+  .gate-cell {
+    background: var(--dim);
+    border-radius: 4px;
+    padding: 10px 6px;
+    text-align: center;
+    border: 1px solid transparent;
+  }
+  .gate-cell.passed { border-color: var(--green); background: rgba(74,124,89,0.15); }
+  .gate-cell.current { border-color: var(--amber); background: rgba(212,136,10,0.1); }
+  .gate-cell.locked  { opacity: 0.4; }
+  .gate-num { font-family: 'Courier New', monospace; font-size: 10px; color: var(--amber); letter-spacing: 1px; }
+  .gate-status { font-size: 18px; margin: 4px 0; }
+  .gate-score { font-family: 'Courier New', monospace; font-size: 9px; color: var(--muted); }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--dim); margin: 24px 0; }
+
+  /* ── Info pill ── */
+  .pill {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    background: rgba(212,136,10,0.15);
+    color: var(--amber);
+    border: 1px solid rgba(212,136,10,0.3);
+    margin-bottom: 16px;
+  }
+
+  /* ── Log panel (right side) ── */
+  .log-panel {
+    width: 320px;
+    min-width: 280px;
+    background: #0f0700;
+    border-left: 1px solid var(--dim);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .log-header-title { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+  .log-clear { font-family: 'Courier New', monospace; font-size: 9px; color: var(--muted); cursor: pointer; letter-spacing: 1px; background: none; border: none; }
+  .log-clear:hover { color: var(--cream); }
+  .log-entries { flex: 1; overflow-y: auto; padding: 8px; }
+  .log-entry { font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.5; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .log-entry .le-meta { color: var(--muted); margin-bottom: 2px; }
+  .log-entry .le-ok   { color: var(--green); }
+  .log-entry .le-err  { color: var(--danger); }
+  .log-entry .le-body { color: #888; margin-top: 4px; word-break: break-all; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 3px; }
+
+  /* ── Misc ── */
+  .hint { font-family: 'Courier New', monospace; font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .section-gap { margin-top: 28px; }
+  .user-status-bar {
+    background: rgba(212,136,10,0.08);
+    border: 1px solid rgba(212,136,10,0.2);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    display: none;
+  }
+  .user-status-bar.visible { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <span class="topbar-title">THE BOOTH — Flow Simulator</span>
+  <div class="topbar-right">
+    <input class="api-input" id="api-base" value="https://the-booth-api-production.up.railway.app" placeholder="API base URL" />
+    <span class="token-badge no-token" id="token-badge">NO TOKEN</span>
+  </div>
+</div>
+
+<!-- ── Layout ── -->
+<div class="layout">
+
+  <!-- Left rail -->
+  <nav class="rail">
+    <div class="rail-section">Auth</div>
+    <div class="rail-step active" id="nav-register" onclick="showPanel('register')">
+      <div class="step-dot"></div> Register
+    </div>
+    <div class="rail-step" id="nav-login" onclick="showPanel('login')">
+      <div class="step-dot"></div> Login
+    </div>
+
+    <div class="rail-section">Onboarding</div>
+    <div class="rail-step" id="nav-intro" onclick="showPanel('intro')">
+      <div class="step-dot"></div> Operator Intro
+    </div>
+    <div class="rail-step" id="nav-legal" onclick="showPanel('legal')">
+      <div class="step-dot"></div> Legal Ack
+    </div>
+    <div class="rail-step" id="nav-softq" onclick="showPanel('softq')">
+      <div class="step-dot"></div> Soft Questions
+    </div>
+    <div class="rail-step" id="nav-commit" onclick="showPanel('commit')">
+      <div class="step-dot"></div> Commitment
+    </div>
+
+    <div class="rail-section">Gates</div>
+    <div class="rail-step" id="nav-gate-progress" onclick="showPanel('gate-progress')">
+      <div class="step-dot"></div> Progress
+    </div>
+    <div class="rail-step" id="nav-gate-run" onclick="showPanel('gate-run')">
+      <div class="step-dot"></div> Run a Gate
+    </div>
+
+    <div class="rail-section">Payments</div>
+    <div class="rail-step" id="nav-pay" onclick="showPanel('pay')">
+      <div class="step-dot"></div> Gate Access Pass
+    </div>
+
+    <div class="rail-section">Match + Booth</div>
+    <div class="rail-step" id="nav-match" onclick="showPanel('match')">
+      <div class="step-dot"></div> Match Hunt
+    </div>
+    <div class="rail-step" id="nav-booth" onclick="showPanel('booth')">
+      <div class="step-dot"></div> Booth Session
+    </div>
+
+    <div class="rail-section">Operator</div>
+    <div class="rail-step" id="nav-answering" onclick="showPanel('answering')">
+      <div class="step-dot"></div> Answering Machine
+    </div>
+    <div class="rail-step" id="nav-ghost" onclick="showPanel('ghost')">
+      <div class="step-dot"></div> Ghost Gallery
+    </div>
+  </nav>
+
+  <!-- Main + log -->
+  <div class="main">
+    <div class="panel-area">
+
+      <!-- User status bar (shown when logged in) -->
+      <div class="user-status-bar" id="user-status-bar">
+        <span id="usb-name">—</span>
+        <span style="color:var(--muted)">·</span>
+        <span id="usb-status">—</span>
+        <span style="color:var(--muted)">·</span>
+        <span id="usb-email" style="color:var(--muted)">—</span>
+        <button class="btn-ghost" style="margin-left:auto;font-size:9px;padding:3px 8px" onclick="doLogout()">Sign Out</button>
+      </div>
+
+      <!-- ── REGISTER ── -->
+      <div class="panel active" id="panel-register">
+        <div class="panel-title">Register</div>
+        <div class="panel-desc">POST /api/auth/register</div>
+
+        <div class="field"><label>First Name</label><input type="text" id="reg-name" value="Test" /></div>
+        <div class="field"><label>Email</label><input type="email" id="reg-email" value="smoke_new@thebooth.app" /></div>
+        <div class="field"><label>Password</label><input type="password" id="reg-pass" value="TestBooth2026!" /></div>
+        <div class="field"><label>Age</label><input type="number" id="reg-age" value="30" /></div>
+        <div class="field"><label>Gender</label>
+          <select id="reg-gender"><option value="MALE">Male</option><option value="FEMALE">Female</option></select>
+        </div>
+        <div class="field"><label>City</label><input type="text" id="reg-city" value="Chicago" /></div>
+        <div class="field"><label>State</label><input type="text" id="reg-state" value="IL" /></div>
+
+        <div class="btn-row">
+          <button class="btn" onclick="doRegister()">Register</button>
+        </div>
+        <div class="hint" style="margin-top:16px">Or use a QA seed user below — just go to Login.</div>
+
+        <hr class="divider" />
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-bottom:10px;letter-spacing:1px">QA SEED USERS — password: TestBooth2026!</div>
+        <div id="qa-user-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div class="result-box" id="reg-result"></div>
+      </div>
+
+      <!-- ── LOGIN ── -->
+      <div class="panel" id="panel-login">
+        <div class="panel-title">Login</div>
+        <div class="panel-desc">POST /api/auth/login</div>
+        <div class="field"><label>Email</label><input type="email" id="login-email" value="test_gate_1@thebooth.app" /></div>
+        <div class="field"><label>Password</label><input type="password" id="login-pass" value="TestBooth2026!" /></div>
+        <div class="btn-row">
+          <button class="btn" onclick="doLogin()">Login</button>
+        </div>
+        <div class="result-box" id="login-result"></div>
+      </div>
+
+      <!-- ── OPERATOR INTRO ── -->
+      <div class="panel" id="panel-intro">
+        <div class="panel-title">Operator Intro</div>
+        <div class="panel-desc">POST /api/operator/introduce — parts 1–4</div>
+        <div class="pill">Requires login</div>
+        <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">
+          Walk through all four intro parts in order. Each returns an audio URL — the player will load automatically.
+        </p>
+        <div id="intro-parts" style="display:flex;flex-direction:column;gap:16px"></div>
+        <div class="result-box" id="intro-result"></div>
+      </div>
+
+      <!-- ── LEGAL ACK ── -->
+      <div class="panel" id="panel-legal">
+        <div class="panel-title">Legal Acknowledgment</div>
+        <div class="panel-desc">POST /api/operator/legal-ack</div>
+        <div class="pill">Requires login</div>
+        <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">
+          Simulate the user agreeing to the terms. Advances status to LEGAL_ACKNOWLEDGED.
+        </p>
+        <div class="field">
+          <label>Transcription (optional spoken text)</label>
+          <input type="text" id="legal-transcript" value="I agree" />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="doLegalAck()">Acknowledge</button>
+        </div>
+        <div class="result-box" id="legal-result"></div>
+      </div>
+
+      <!-- ── SOFT QUESTIONS ── -->
+      <div class="panel" id="panel-softq">
+        <div class="panel-title">Soft Questions</div>
+        <div class="panel-desc">POST /api/operator/soft-question + soft-answer</div>
+        <div class="pill">Requires LEGAL_ACKNOWLEDGED</div>
+
+        <div id="sq1-block">
+          <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:12px">SOFT QUESTION 1</div>
+          <button class="btn btn-ghost" onclick="getSoftQuestion(1)">Get Question 1 Audio</button>
+          <div id="sq1-audio-wrap" style="margin-top:12px;display:none">
+            <audio id="sq1-audio" controls class="audio-player"></audio>
+          </div>
+          <div class="field section-gap"><label>Your Answer</label><textarea id="sq1-answer" placeholder="Type or paste your spoken answer…"></textarea></div>
+          <button class="btn" onclick="submitSoftAnswer(1)">Submit Answer 1</button>
+        </div>
+
+        <hr class="divider" />
+
+        <div id="sq2-block" style="opacity:0.4">
+          <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:12px">SOFT QUESTION 2</div>
+          <button class="btn btn-ghost" onclick="getSoftQuestion(2)">Get Question 2 Audio</button>
+          <div id="sq2-audio-wrap" style="margin-top:12px;display:none">
+            <audio id="sq2-audio" controls class="audio-player"></audio>
+          </div>
+          <div class="field section-gap"><label>Your Answer</label><textarea id="sq2-answer" placeholder="Type or paste your spoken answer…"></textarea></div>
+          <button class="btn" onclick="submitSoftAnswer(2)">Submit Answer 2</button>
+        </div>
+
+        <div class="result-box" id="softq-result"></div>
+      </div>
+
+      <!-- ── COMMITMENT ── -->
+      <div class="panel" id="panel-commit">
+        <div class="panel-title">Commitment</div>
+        <div class="panel-desc">POST /api/operator/commitment-confirm</div>
+        <div class="pill">Requires INTAKE_COMPLETE</div>
+        <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">
+          Final onboarding step. Advances status to GATE_1_ELIGIBLE.
+        </p>
+        <div class="field">
+          <label>Transcription (optional)</label>
+          <input type="text" id="commit-transcript" value="I am ready" />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="doCommit()">Confirm Commitment</button>
+        </div>
+        <div class="result-box" id="commit-result"></div>
+      </div>
+
+      <!-- ── GATE PROGRESS ── -->
+      <div class="panel" id="panel-gate-progress">
+        <div class="panel-title">Gate Progress</div>
+        <div class="panel-desc">GET /api/gates</div>
+        <div class="pill">Requires login</div>
+        <div class="btn-row">
+          <button class="btn" onclick="loadGateProgress()">Load Progress</button>
+        </div>
+        <div class="gate-grid" id="gate-grid" style="display:none"></div>
+        <div class="result-box" id="gate-progress-result"></div>
+      </div>
+
+      <!-- ── RUN A GATE ── -->
+      <div class="panel" id="panel-gate-run">
+        <div class="panel-title">Run a Gate</div>
+        <div class="panel-desc">Start → Record → Upload → Submit</div>
+        <div class="pill">Requires GATE_1_ELIGIBLE or IN_GATES</div>
+
+        <div class="field">
+          <label>Gate Number</label>
+          <select id="gate-num">
+            <option value="1">Gate 1 — The Bouncer</option>
+            <option value="2">Gate 2 — The Anchor Protocols</option>
+            <option value="3">Gate 3 — The Attachment Gate</option>
+            <option value="4">Gate 4 — The Shadow Mirror</option>
+            <option value="5">Gate 5 — Cognitive Dissonance Check</option>
+            <option value="6">Gate 6 — Role Advisory</option>
+            <option value="7">Gate 7 — The Covenant Gate</option>
+          </select>
+        </div>
+
+        <!-- Step 1: Start -->
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:10px">STEP 1 — START SESSION</div>
+        <button class="btn btn-ghost" id="btn-gate-start" onclick="startGateSession()">Start Gate Session</button>
+        <div id="gate-prompt-wrap" style="margin-top:16px;display:none">
+          <div style="font-family:'Courier New',monospace;font-size:9px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">OPERATOR PROMPT</div>
+          <audio id="gate-prompt-audio" controls class="audio-player" style="margin-bottom:10px"></audio>
+          <div id="gate-prompt-text" style="font-size:13px;color:#aaa;font-style:italic;line-height:1.7;border-left:2px solid var(--red);padding-left:14px"></div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Step 2: Record -->
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:10px">STEP 2 — RECORD RESPONSE</div>
+        <div class="rec-widget">
+          <div class="rec-light" id="rec-light"></div>
+          <div class="rec-timer" id="rec-timer">0:00</div>
+          <div class="rec-status" id="rec-status">Press Record when ready</div>
+          <div class="btn-row">
+            <button class="btn btn-amber" id="btn-record" onclick="startRecording()" disabled>● Record</button>
+            <button class="btn btn-ghost" id="btn-stop" onclick="stopRecording()" disabled>■ Stop</button>
+          </div>
+          <audio id="rec-playback" controls class="audio-player" style="display:none"></audio>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Step 3: Submit -->
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:10px">STEP 3 — SUBMIT FOR SCORING</div>
+        <button class="btn" id="btn-submit-gate" onclick="submitGate()" disabled>Submit Recording</button>
+        <div class="hint">Uploads to R2, then runs Deepgram transcription + GPT-4o scoring. Takes 10–20 seconds.</div>
+
+        <!-- Score card -->
+        <div class="score-card" id="gate-score-card">
+          <div class="score-title">GATE RESULT</div>
+          <div class="score-total" id="sc-total">—</div>
+          <div class="score-row"><div class="score-lbl">Depth</div><div class="score-track"><div class="score-fill" id="sc-depth"></div></div><div class="score-val" id="sc-depth-val"></div></div>
+          <div class="score-row"><div class="score-lbl">Consistency</div><div class="score-track"><div class="score-fill" id="sc-consist"></div></div><div class="score-val" id="sc-consist-val"></div></div>
+          <div class="score-row"><div class="score-lbl">Reflection</div><div class="score-track"><div class="score-fill" id="sc-reflect"></div></div><div class="score-val" id="sc-reflect-val"></div></div>
+          <div class="score-row"><div class="score-lbl">Growth</div><div class="score-track"><div class="score-fill" id="sc-growth"></div></div><div class="score-val" id="sc-growth-val"></div></div>
+          <div id="sc-badge" class="pass-badge"></div>
+          <hr class="divider" />
+          <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">TRANSCRIPT</div>
+          <div id="sc-transcript" style="font-size:13px;color:#aaa;font-style:italic;line-height:1.7"></div>
+          <div id="sc-feedback-wrap" style="margin-top:12px;display:none">
+            <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">OPERATOR FEEDBACK</div>
+            <audio id="sc-feedback-audio" controls class="audio-player"></audio>
+          </div>
+        </div>
+
+        <div class="result-box" id="gate-run-result"></div>
+      </div>
+
+      <!-- ── PAYMENTS ── -->
+      <div class="panel" id="panel-pay">
+        <div class="panel-title">Gate Access Pass</div>
+        <div class="panel-desc">POST /api/payments/gate-access — $19.99 one-time</div>
+        <div class="pill">Requires GATE_1_ELIGIBLE</div>
+        <p style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">
+          Unlocks Gates 2–7. In the test environment this creates a Stripe PaymentIntent — you can check status below without completing payment.
+        </p>
+        <div class="btn-row">
+          <button class="btn" onclick="doPayGate()">Create Payment Intent</button>
+          <button class="btn btn-ghost" onclick="checkPayStatus()">Check Payment Status</button>
+        </div>
+        <div class="result-box" id="pay-result"></div>
+      </div>
+
+      <!-- ── MATCH ── -->
+      <div class="panel" id="panel-match">
+        <div class="panel-title">Match Hunt</div>
+        <div class="panel-desc">POST /api/booth/match/hunt · GET /api/booth/match</div>
+        <div class="pill">Requires GATES_COMPLETE</div>
+        <div class="btn-row">
+          <button class="btn" onclick="doMatchHunt()">Trigger Match Hunt</button>
+          <button class="btn btn-ghost" onclick="getMatchStatus()">Get Match Status</button>
+        </div>
+        <div class="result-box" id="match-result"></div>
+      </div>
+
+      <!-- ── BOOTH ── -->
+      <div class="panel" id="panel-booth">
+        <div class="panel-title">Booth Session</div>
+        <div class="panel-desc">POST /api/booth/session · GET /api/booth/session/:id</div>
+        <div class="pill">Requires BOOTH_SCHEDULED</div>
+        <div class="btn-row">
+          <button class="btn" onclick="createBoothSession()">Create Session</button>
+          <button class="btn btn-ghost" onclick="getBoothSession()">Get Session Status</button>
+        </div>
+        <div class="field section-gap">
+          <label>Session ID (for status check)</label>
+          <input type="text" id="booth-session-id" placeholder="paste session ID…" />
+        </div>
+        <div class="result-box" id="booth-result"></div>
+      </div>
+
+      <!-- ── ANSWERING MACHINE ── -->
+      <div class="panel" id="panel-answering">
+        <div class="panel-title">Answering Machine</div>
+        <div class="panel-desc">GET /api/operator/answering-machine</div>
+        <div class="pill">Requires login</div>
+        <div class="btn-row">
+          <button class="btn" onclick="loadAnsweringMachine()">Load Messages</button>
+          <button class="btn btn-ghost" onclick="markAllRead()">Mark All Read</button>
+        </div>
+        <div id="notif-list" style="margin-top:20px"></div>
+        <div class="result-box" id="answering-result"></div>
+      </div>
+
+      <!-- ── GHOST GALLERY ── -->
+      <div class="panel" id="panel-ghost">
+        <div class="panel-title">Ghost Gallery</div>
+        <div class="panel-desc">GET /api/booth/ghost-gallery</div>
+        <div class="pill">Requires login</div>
+        <div class="btn-row">
+          <button class="btn" onclick="loadGhostGallery()">Load Ghosts</button>
+        </div>
+        <div id="ghost-list" style="margin-top:20px"></div>
+        <div class="result-box" id="ghost-result"></div>
+      </div>
+
+    </div><!-- /panel-area -->
+
+    <!-- Right log panel -->
+    <div class="log-panel">
+      <div class="log-header">
+        <span class="log-header-title">REQUEST LOG</span>
+        <button class="log-clear" onclick="clearLog()">CLEAR</button>
+      </div>
+      <div class="log-entries" id="log-entries"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let token = null;
+let currentUser = null;
+let gateSessionId = null;
+let gateAttempt = 1;
+let mediaRecorder = null;
+let audioChunks = [];
+let recBlob = null;
+let recTimerInterval = null;
+let recSeconds = 0;
+
+// QA seed users
+const QA_USERS = [
+  { email: 'test_fresh_signup@thebooth.app',    status: 'ONBOARDING' },
+  { email: 'test_legal_ack@thebooth.app',       status: 'LEGAL_ACKNOWLEDGED' },
+  { email: 'test_intake_complete@thebooth.app', status: 'INTAKE_COMPLETE' },
+  { email: 'test_gate_1@thebooth.app',          status: 'GATE_1_ELIGIBLE' },
+  { email: 'test_in_gates@thebooth.app',        status: 'IN_GATES' },
+  { email: 'test_gates_complete@thebooth.app',  status: 'GATES_COMPLETE' },
+  { email: 'test_awaiting_match@thebooth.app',  status: 'AWAITING_MATCH' },
+  { email: 'test_booth_scheduled@thebooth.app', status: 'BOOTH_SCHEDULED' },
+  { email: 'test_completed@thebooth.app',       status: 'COMPLETED' },
+];
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildIntroPanel();
+  buildQaUserList();
+  updateTokenBadge();
+});
+
+function buildQaUserList() {
+  const el = document.getElementById('qa-user-list');
+  QA_USERS.forEach(u => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--warm);border-radius:3px;border:1px solid var(--dim);cursor:pointer';
+    row.innerHTML = `<span style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);width:140px;letter-spacing:0.5px">${u.status}</span><span style="font-size:12px;color:#aaa;flex:1">${u.email}</span>`;
+    row.onclick = () => {
+      document.getElementById('login-email').value = u.email;
+      document.getElementById('login-pass').value = 'TestBooth2026!';
+      showPanel('login');
+    };
+    el.appendChild(row);
+  });
+}
+
+function buildIntroPanel() {
+  const wrap = document.getElementById('intro-parts');
+  for (let i = 1; i <= 4; i++) {
+    wrap.innerHTML += `
+      <div style="background:var(--warm);border:1px solid var(--dim);border-radius:4px;padding:16px">
+        <div style="font-family:'Courier New',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:10px">PART ${i}</div>
+        <button class="btn btn-ghost" onclick="getIntroPart(${i})">Get Part ${i} Audio</button>
+        <div id="intro-audio-${i}-wrap" style="margin-top:10px;display:none">
+          <audio id="intro-audio-${i}" controls class="audio-player"></audio>
+        </div>
+      </div>`;
+  }
+}
+
+// ─── Panel navigation ─────────────────────────────────────────────────────────
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.rail-step').forEach(s => s.classList.remove('active'));
+  const panel = document.getElementById('panel-' + name);
+  const nav   = document.getElementById('nav-' + name);
+  if (panel) panel.classList.add('active');
+  if (nav)   nav.classList.add('active');
+}
+
+// ─── Token helpers ────────────────────────────────────────────────────────────
+function setToken(t) {
+  token = t;
+  updateTokenBadge();
+}
+
+function updateTokenBadge() {
+  const el = document.getElementById('token-badge');
+  if (token) {
+    el.className = 'token-badge has-token';
+    el.textContent = '● TOKEN SET';
+  } else {
+    el.className = 'token-badge no-token';
+    el.textContent = 'NO TOKEN';
+  }
+}
+
+function updateUserBar(user) {
+  if (!user) { document.getElementById('user-status-bar').classList.remove('visible'); return; }
+  currentUser = user;
+  document.getElementById('usb-name').textContent = user.firstName || user.name || '—';
+  document.getElementById('usb-status').textContent = user.status || '—';
+  document.getElementById('usb-email').textContent = user.email || '—';
+  document.getElementById('user-status-bar').classList.add('visible');
+}
+
+function doLogout() {
+  token = null; currentUser = null;
+  updateTokenBadge();
+  updateUserBar(null);
+  showPanel('login');
+}
+
+// ─── API call helper ──────────────────────────────────────────────────────────
+function apiBase() { return document.getElementById('api-base').value.replace(/\/$/, ''); }
+
+async function call(method, path, body, extraHeaders = {}) {
+  const t0 = Date.now();
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  try {
+    const res = await fetch(apiBase() + path, opts);
+    const ms = Date.now() - t0;
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+    logEntry(method, path, res.status, data, ms);
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    logEntry(method, path, 'ERR', { error: e.message }, Date.now() - t0);
+    return { ok: false, status: 0, data: { error: e.message } };
+  }
+}
+
+// ─── Result box helpers ───────────────────────────────────────────────────────
+function showResult(id, data, type = 'ok') {
+  const el = document.getElementById(id);
+  el.className = `result-box visible ${type}`;
+  el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+function hideResult(id) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'result-box';
+}
+
+// ─── Log panel ────────────────────────────────────────────────────────────────
+function logEntry(method, path, status, data, ms) {
+  const el = document.getElementById('log-entries');
+  const ok = typeof status === 'number' && status >= 200 && status < 300;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `
+    <div class="le-meta">${new Date().toLocaleTimeString()} · ${ms}ms</div>
+    <div class="${ok ? 'le-ok' : 'le-err'}">${method} ${path} → ${status}</div>
+    <div class="le-body">${JSON.stringify(data, null, 2).slice(0, 600)}</div>`;
+  el.prepend(entry);
+}
+
+function clearLog() { document.getElementById('log-entries').innerHTML = ''; }
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function doRegister() {
+  const r = await call('POST', '/api/auth/register', {
+    firstName: document.getElementById('reg-name').value,
+    email: document.getElementById('reg-email').value,
+    password: document.getElementById('reg-pass').value,
+    age: parseInt(document.getElementById('reg-age').value),
+    gender: document.getElementById('reg-gender').value,
+    city: document.getElementById('reg-city').value,
+    state: document.getElementById('reg-state').value,
+  });
+  if (r.ok && r.data.accessToken) {
+    setToken(r.data.accessToken);
+    updateUserBar(r.data.user);
+    showResult('reg-result', r.data, 'ok');
+  } else {
+    showResult('reg-result', r.data, 'err');
+  }
+}
+
+async function doLogin() {
+  const r = await call('POST', '/api/auth/login', {
+    email: document.getElementById('login-email').value,
+    password: document.getElementById('login-pass').value,
+  });
+  if (r.ok && r.data.accessToken) {
+    setToken(r.data.accessToken);
+    updateUserBar(r.data.user);
+    document.getElementById('nav-login').classList.add('done');
+    showResult('login-result', r.data, 'ok');
+  } else {
+    showResult('login-result', r.data, 'err');
+  }
+}
+
+// ─── OPERATOR INTRO ───────────────────────────────────────────────────────────
+async function getIntroPart(part) {
+  const r = await call('POST', '/api/operator/introduce', { part });
+  if (r.ok && r.data.audioUrl) {
+    const wrap = document.getElementById(`intro-audio-${part}-wrap`);
+    const audio = document.getElementById(`intro-audio-${part}`);
+    audio.src = r.data.audioUrl;
+    wrap.style.display = 'block';
+    audio.play().catch(() => {});
+  } else {
+    showResult('intro-result', r.data, 'err');
+  }
+}
+
+// ─── LEGAL ACK ────────────────────────────────────────────────────────────────
+async function doLegalAck() {
+  const r = await call('POST', '/api/operator/legal-ack', {
+    acknowledged: true,
+    transcription: document.getElementById('legal-transcript').value,
+  });
+  showResult('legal-result', r.data, r.ok ? 'ok' : 'err');
+  if (r.ok && r.data.status) updateUserBar({ ...currentUser, status: r.data.status });
+}
+
+// ─── SOFT QUESTIONS ───────────────────────────────────────────────────────────
+async function getSoftQuestion(q) {
+  const r = await call('POST', '/api/operator/soft-question', { question: q });
+  if (r.ok && r.data.audioUrl) {
+    const wrap = document.getElementById(`sq${q}-audio-wrap`);
+    const audio = document.getElementById(`sq${q}-audio`);
+    audio.src = r.data.audioUrl;
+    wrap.style.display = 'block';
+    audio.play().catch(() => {});
+    if (q === 1) document.getElementById('sq2-block').style.opacity = '1';
+  } else {
+    showResult('softq-result', r.data, 'err');
+  }
+}
+
+async function submitSoftAnswer(q) {
+  const r = await call('POST', '/api/operator/soft-answer', {
+    question: q,
+    transcription: document.getElementById(`sq${q}-answer`).value,
+  });
+  showResult('softq-result', r.data, r.ok ? 'ok' : 'err');
+  if (r.ok && r.data.intakeComplete && currentUser) {
+    updateUserBar({ ...currentUser, status: 'INTAKE_COMPLETE' });
+  }
+}
+
+// ─── COMMITMENT ───────────────────────────────────────────────────────────────
+async function doCommit() {
+  const r = await call('POST', '/api/operator/commitment-confirm', {
+    confirmed: true,
+    transcription: document.getElementById('commit-transcript').value,
+  });
+  showResult('commit-result', r.data, r.ok ? 'ok' : 'err');
+  if (r.ok && r.data.success && currentUser) {
+    updateUserBar({ ...currentUser, status: 'GATE_1_ELIGIBLE' });
+  }
+}
+
+// ─── GATE PROGRESS ────────────────────────────────────────────────────────────
+async function loadGateProgress() {
+  const r = await call('GET', '/api/gates');
+  if (r.ok) {
+    renderGateGrid(r.data);
+    showResult('gate-progress-result', r.data, 'ok');
+  } else {
+    showResult('gate-progress-result', r.data, 'err');
+  }
+}
+
+function renderGateGrid(data) {
+  const grid = document.getElementById('gate-grid');
+  grid.style.display = 'grid';
+  grid.innerHTML = '';
+  const gp = data.gateProgress || [];
+  const nextNum = gp.find(g => !g.passed)?.gateNumber;
+  gp.forEach(g => {
+    const isCurrent = g.gateNumber === nextNum;
+    const cell = document.createElement('div');
+    cell.className = `gate-cell ${g.passed ? 'passed' : isCurrent ? 'current' : 'locked'}`;
+    cell.innerHTML = `
+      <div class="gate-num">G${g.gateNumber}</div>
+      <div class="gate-status">${g.passed ? '✓' : isCurrent ? '→' : '○'}</div>
+      <div class="gate-score">${g.passed ? (g.score + '/9') : ''}</div>`;
+    grid.appendChild(cell);
+  });
+}
+
+// ─── GATE RUN ─────────────────────────────────────────────────────────────────
+async function startGateSession() {
+  const gateNum = document.getElementById('gate-num').value;
+  hideResult('gate-run-result');
+  document.getElementById('gate-score-card').classList.remove('visible');
+  recBlob = null;
+  gateSessionId = null;
+
+  const r = await call('POST', `/api/gates/${gateNum}/start`);
+  if (r.ok) {
+    gateSessionId = r.data.sessionId;
+    gateAttempt = 1;
+
+    // Show prompt
+    const wrap = document.getElementById('gate-prompt-wrap');
+    const audio = document.getElementById('gate-prompt-audio');
+    const text  = document.getElementById('gate-prompt-text');
+    audio.src = r.data.promptAudioUrl;
+    text.textContent = r.data.promptText || '';
+    wrap.style.display = 'block';
+    audio.play().catch(() => {});
+
+    // Enable record button
+    document.getElementById('btn-record').disabled = false;
+    document.getElementById('btn-submit-gate').disabled = true;
+  } else {
+    showResult('gate-run-result', r.data, 'err');
+  }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    recSeconds = 0;
+    document.getElementById('rec-timer').textContent = '0:00';
+    document.getElementById('rec-playback').style.display = 'none';
+
+    // Use audio/webm on Chrome, audio/mp4 on Safari
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/mp4';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const mime = mimeType.split(';')[0]; // 'audio/webm' or 'audio/mp4'
+      recBlob = new Blob(audioChunks, { type: mime });
+      const url = URL.createObjectURL(recBlob);
+      const pb = document.getElementById('rec-playback');
+      pb.src = url;
+      pb.style.display = 'block';
+      document.getElementById('btn-submit-gate').disabled = false;
+      document.getElementById('rec-status').textContent = `Recorded ${formatTime(recSeconds)} — ready to submit`;
+    };
+
+    mediaRecorder.start(100);
+    document.getElementById('rec-light').classList.add('recording');
+    document.getElementById('rec-status').textContent = 'Recording…';
+    document.getElementById('btn-record').disabled = true;
+    document.getElementById('btn-stop').disabled = false;
+
+    recTimerInterval = setInterval(() => {
+      recSeconds++;
+      document.getElementById('rec-timer').textContent = formatTime(recSeconds);
+    }, 1000);
+  } catch (e) {
+    showResult('gate-run-result', { error: 'Microphone access denied: ' + e.message }, 'err');
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  clearInterval(recTimerInterval);
+  document.getElementById('rec-light').classList.remove('recording');
+  document.getElementById('btn-stop').disabled = true;
+}
+
+async function submitGate() {
+  if (!recBlob || !gateSessionId) {
+    showResult('gate-run-result', { error: 'Record audio first and start a session.' }, 'err');
+    return;
+  }
+
+  const gateNum = document.getElementById('gate-num').value;
+  const btn = document.getElementById('btn-submit-gate');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  hideResult('gate-run-result');
+
+  // Detect MIME
+  const mimeType = recBlob.type || 'audio/webm';
+
+  // Get presigned upload URL
+  const urlRes = await call('GET', `/api/gates/${gateNum}/upload-url?sessionId=${gateSessionId}&attempt=${gateAttempt}&mimeType=${encodeURIComponent(mimeType)}`);
+  if (!urlRes.ok) {
+    showResult('gate-run-result', urlRes.data, 'err');
+    btn.disabled = false; btn.textContent = 'Submit Recording';
+    return;
+  }
+
+  const { uploadUrl, r2Key } = urlRes.data;
+
+  // Upload to R2
+  btn.textContent = 'Uploading to R2…';
+  try {
+    const upRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: recBlob,
+      headers: { 'Content-Type': mimeType },
+    });
+    if (!upRes.ok) throw new Error(`R2 upload failed: ${upRes.status}`);
+  } catch (e) {
+    showResult('gate-run-result', { error: e.message }, 'err');
+    btn.disabled = false; btn.textContent = 'Submit Recording';
+    return;
+  }
+
+  // Submit for scoring
+  btn.textContent = 'Scoring…';
+  const submitRes = await call('POST', `/api/gates/${gateNum}/submit`, {
+    sessionId: gateSessionId,
+    r2Key,
+    durationSeconds: recSeconds,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Submit Recording';
+
+  if (submitRes.ok) {
+    renderScoreCard(submitRes.data);
+  } else {
+    showResult('gate-run-result', submitRes.data, 'err');
+  }
+}
+
+function renderScoreCard(d) {
+  const card = document.getElementById('gate-score-card');
+  card.classList.add('visible');
+  const passed = d.passed;
+  document.getElementById('sc-total').textContent = `${d.score}/9`;
+  document.getElementById('sc-total').style.color = passed ? 'var(--green)' : 'var(--danger)';
+
+  const b = d.breakdown || {};
+  setBar('depth',   b.depth   ?? 0, 3);
+  setBar('consist', b.consistency ?? 0, 2);
+  setBar('reflect', b.reflection  ?? 0, 2);
+  setBar('growth',  b.growth  ?? 0, 2);
+
+  const badge = document.getElementById('sc-badge');
+  badge.className = `pass-badge ${passed ? 'pass' : 'fail'}`;
+  badge.textContent = passed ? '✓ PASSED' : '✗ NOT YET';
+
+  document.getElementById('sc-transcript').textContent = d.transcript || '—';
+
+  if (d.feedbackAudioUrl) {
+    const fw = document.getElementById('sc-feedback-wrap');
+    const fa = document.getElementById('sc-feedback-audio');
+    fa.src = d.feedbackAudioUrl;
+    fw.style.display = 'block';
+    fa.play().catch(() => {});
+  }
+}
+
+function setBar(key, val, max) {
+  document.getElementById(`sc-${key}`).style.width = `${(val / max) * 100}%`;
+  document.getElementById(`sc-${key}-val`).textContent = `${val}/${max}`;
+}
+
+function formatTime(s) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// ─── PAYMENTS ─────────────────────────────────────────────────────────────────
+async function doPayGate() {
+  const r = await call('POST', '/api/payments/gate-access');
+  showResult('pay-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+async function checkPayStatus() {
+  const r = await call('GET', '/api/payments/status');
+  showResult('pay-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+// ─── MATCH + BOOTH ────────────────────────────────────────────────────────────
+async function doMatchHunt() {
+  const r = await call('POST', '/api/booth/match/hunt');
+  showResult('match-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+async function getMatchStatus() {
+  const r = await call('GET', '/api/booth/match');
+  showResult('match-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+async function createBoothSession() {
+  const r = await call('POST', '/api/booth/session');
+  if (r.ok && r.data.sessionId) {
+    document.getElementById('booth-session-id').value = r.data.sessionId;
+  }
+  showResult('booth-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+async function getBoothSession() {
+  const id = document.getElementById('booth-session-id').value.trim();
+  if (!id) { showResult('booth-result', { error: 'Enter a session ID' }, 'err'); return; }
+  const r = await call('GET', `/api/booth/session/${id}`);
+  showResult('booth-result', r.data, r.ok ? 'ok' : 'err');
+}
+
+// ─── ANSWERING MACHINE ────────────────────────────────────────────────────────
+async function loadAnsweringMachine() {
+  const r = await call('GET', '/api/operator/answering-machine');
+  if (r.ok) {
+    const list = document.getElementById('notif-list');
+    const notifs = r.data.notifications || [];
+    if (notifs.length === 0) {
+      list.innerHTML = '<p style="font-size:13px;color:var(--muted);font-style:italic">No messages.</p>';
+    } else {
+      list.innerHTML = notifs.map(n => `
+        <div class="notif-item ${n.read ? '' : 'unread'}">
+          <div class="notif-title">${n.title}</div>
+          <div class="notif-body">${n.body}</div>
+          ${n.voiceUrl ? `<audio src="${n.voiceUrl}" controls style="width:100%;margin-top:8px"></audio>` : ''}
+          <div class="notif-meta">${n.type} · ${new Date(n.createdAt).toLocaleString()}</div>
+        </div>`).join('');
+    }
+    hideResult('answering-result');
+  } else {
+    showResult('answering-result', r.data, 'err');
+  }
+}
+
+async function markAllRead() {
+  const r = await call('PATCH', '/api/operator/answering-machine/read-all');
+  showResult('answering-result', r.data, r.ok ? 'ok' : 'err');
+  if (r.ok) loadAnsweringMachine();
+}
+
+// ─── GHOST GALLERY ────────────────────────────────────────────────────────────
+async function loadGhostGallery() {
+  const r = await call('GET', '/api/booth/ghost-gallery');
+  if (r.ok) {
+    const list = document.getElementById('ghost-list');
+    const ghosts = r.data.ghosts || [];
+    if (ghosts.length === 0) {
+      list.innerHTML = '<p style="font-size:13px;color:var(--muted);font-style:italic">No ghosts.</p>';
+    } else {
+      list.innerHTML = ghosts.map(g => `
+        <div class="notif-item">
+          <div class="notif-title">${g.ghostType}</div>
+          <div class="notif-body">${g.reason}</div>
+          <div class="notif-meta">${new Date(g.createdAt).toLocaleDateString()}</div>
+        </div>`).join('');
+    }
+    hideResult('ghost-result');
+  } else {
+    showResult('ghost-result', r.data, 'err');
+  }
+}
+</script>
+</body>
+</html>

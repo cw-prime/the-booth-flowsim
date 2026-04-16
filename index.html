@@ -1238,10 +1238,18 @@ function renderScoreCard(d, gateNum) {
     nextMsg = `🔒 Three attempts reached. 30-day reflection period begins now.`;
   } else if (nextAction === 'next_gate') {
     if (gateNum === 7) {
-      nextMsg = `🪙 The coin is complete. All 7 gates passed. Status → GATES_COMPLETE. Proceed to Match Hunt.`;
+      // Fetch the assigned +PB number from answering machine
+      const amRes = await call('GET', '/api/operator/answering-machine');
+      const pbMsg = amRes.ok && amRes.data.messages?.length
+        ? amRes.data.messages[0]?.body ?? ''
+        : '';
+      const pbMatch = pbMsg.match(/\+PB-[\d]+-[\d]+/);
+      const pbNum = pbMatch ? pbMatch[0] : '';
+      nextMsg = `🪙 The coin is complete. All 7 gates passed. Status → GATES_COMPLETE.${ pbNum ? ' Your number: ' + pbNum : ''} Proceed to Match Hunt.`;
       // Update status bar
       updateUserBar({ ...currentUser, status: 'GATES_COMPLETE' });
       if (currentUser) currentUser.status = 'GATES_COMPLETE';
+      setTimeout(() => loadGateProgress(), 800);
     } else {
       nextMsg = `✅ Advancing to Gate ${gateNum + 1}.`;
     }

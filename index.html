@@ -936,7 +936,9 @@ async function doRegister() {
   if (r.ok && r.data.accessToken) {
     setToken(r.data.accessToken);
     updateUserBar(r.data.user);
+    document.getElementById('nav-register').classList.add('done');
     showResult('reg-result', r.data, 'ok');
+    setTimeout(() => showPanel('intro'), 800);
   } else {
     showResult('reg-result', r.data, 'err');
   }
@@ -952,6 +954,17 @@ async function doLogin() {
     updateUserBar(r.data.user);
     document.getElementById('nav-login').classList.add('done');
     showResult('login-result', r.data, 'ok');
+    // Route to the right panel based on user status
+    const status = r.data.user?.status;
+    setTimeout(() => {
+      if (status === 'ONBOARDING') showPanel('intro');
+      else if (status === 'LEGAL_ACKNOWLEDGED') showPanel('legal');
+      else if (status === 'INTAKE_COMPLETE') showPanel('commitment');
+      else if (status === 'GATE_1_ELIGIBLE' || status === 'IN_GATES') showPanel('gate-progress');
+      else if (status === 'GATES_COMPLETE' || status === 'AWAITING_MATCH') showPanel('match-hunt');
+      else if (status === 'BOOTH_SCHEDULED' || status === 'COMPLETED') showPanel('booth-session');
+      else showPanel('intro');
+    }, 800);
   } else {
     showResult('login-result', r.data, 'err');
   }

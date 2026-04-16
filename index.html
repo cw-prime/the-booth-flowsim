@@ -397,6 +397,9 @@
   <span class="topbar-title">THE BOOTH — Flow Simulator</span>
   <div class="topbar-right">
     <input class="api-input" id="api-base" value="https://the-booth-api-production.up.railway.app" placeholder="API base URL" />
+    <label style="color:#aaa;font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="use-proxy" onchange="toggleProxy(this)" style="cursor:pointer"> CORS proxy
+    </label>
     <span class="token-badge no-token" id="token-badge">NO TOKEN</span>
   </div>
 </div>
@@ -859,7 +862,13 @@ function doLogout() {
 }
 
 // ─── API call helper ──────────────────────────────────────────────────────────
-function apiBase() { return document.getElementById('api-base').value.replace(/\/$/, ''); }
+const PROXY = 'https://corsproxy.io/?url=';
+let useProxy = false;
+function toggleProxy(cb) { useProxy = cb.checked; }
+function apiBase() {
+  const base = document.getElementById('api-base').value.replace(/\/$/, '');
+  return useProxy ? PROXY + encodeURIComponent(base) : base;
+}
 
 async function call(method, path, body, extraHeaders = {}) {
   const t0 = Date.now();

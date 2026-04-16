@@ -599,6 +599,7 @@
         <div class="pill">Requires login</div>
         <div class="btn-row">
           <button class="btn" onclick="loadGateProgress()">Load Progress</button>
+          <button class="btn" style="background:rgba(255,160,0,0.15);border-color:var(--amber);color:var(--amber)" onclick="devBypassTimers()">⚡ Bypass Timers (Dev)</button>
         </div>
         <div class="gate-grid" id="gate-grid" style="display:none"></div>
         <div class="result-box" id="gate-progress-result"></div>
@@ -1060,6 +1061,15 @@ function renderGateGrid(data) {
       <div class="gate-score">${g.passed ? (g.score + '/9') : ''}</div>`;
     grid.appendChild(cell);
   });
+}
+
+async function devBypassTimers() {
+  const r = await call('POST', '/api/dev/bypass-timers');
+  showResult('gate-progress-result', r.data, r.ok ? 'ok' : 'err');
+  if (r.ok) {
+    await loadGateProgress();
+    updateUserBar({ ...currentUser, status: r.data.status || currentUser?.status });
+  }
 }
 
 // ─── GATE RUN ─────────────────────────────────────────────────────────────────
